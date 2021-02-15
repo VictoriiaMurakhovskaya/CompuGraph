@@ -115,15 +115,6 @@ def case3(c, phi, A):
     return calc(A, B, alpha, beta, phi)
 
 
-def use_reference():
-    """
-    выводит сообщение об использовании скрипта с параметрами командной строки
-    :return: None
-    """
-    print('Некорректное использование аргументов запуска\nДля запуска укажите следующие параметры:')
-    print('\t type= для определения типа задачи \n \t с= для задания стороны \n \t phi= для задания угла')
-
-
 def get_parameters(lst):
     """
     формирование словаря параметров из списка параметров командной стркоки sys.argv
@@ -147,6 +138,20 @@ def get_parameters(lst):
             except ValueError:
                 res.update({p_name: (0, 0)})
     return res
+
+
+def ask_parametrs():
+    res = {}
+    try:
+        res.update({'type': float(input('Тип задачи (число от 1 до 3) '))})
+        res.update({'c': float(input('Длина стороны? c='))})
+        res.update({'phi': float(input('Угол наклона? phi='))})
+        Astr = input('Координаты точки А? (ввод через ",": Ax, Ay)')
+        res.update({'A': (float(Astr.split(',')[0]), float(Astr.split(',')[1]))})
+        return res
+    except:
+        print('Недопустимый формат ввода')
+        sys.exit(1)
 
 
 def plot(A, B, C1, C2):
@@ -178,13 +183,12 @@ def main():
     основная процедура
     :return: None
     """
-    # проверка аргументов запуска скрипта
-    if len(sys.argv) != 5:
-        use_reference()
-        sys.exit(1)
 
     # получение присвоение параметров для проведения расчетов
-    params = get_parameters(sys.argv[1:])
+    if len(sys.argv) == 5:
+        params = get_parameters(sys.argv[1:])
+    else:
+        params = ask_parametrs()
     try:
         task_type = params['type']
         c = params['c']
