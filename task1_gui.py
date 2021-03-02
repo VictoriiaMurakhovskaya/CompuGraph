@@ -50,7 +50,7 @@ class App:
         self.scal_b.set(100)
         self.scal_b.bind("<ButtonRelease-1>", self.draw_triangle)
         Label(setup1, text='Угол \u03b1').pack(side=TOP, pady=(10, 0), padx=(10, 0), anchor=W)
-        self.scal_alpha = Scale(setup1, orient=HORIZONTAL, length=200, from_=0, to=90, tickinterval=15, resolution=5)
+        self.scal_alpha = Scale(setup1, orient=HORIZONTAL, length=200, from_=0, to=180, tickinterval=30, resolution=15)
         self.scal_alpha.pack(side=TOP)
         self.scal_alpha.set(30)
         self.scal_alpha.bind("<ButtonRelease-1>", self.draw_triangle)
@@ -206,14 +206,14 @@ class App:
 
 class Math:
     def __init__(self, A, B, zero):
-        self.A, self.B = self.shift_x(A), self.shift_y(B)
+        self.zero_x = zero[0]
+        self.zero_y = zero[1]
+        self.A, self.B = self.shift(A), self.shift(B)
         self.C1, self.C2 = (0, 0), (0, 0)
         Ax, Ay = self.A[0], self.A[1]
         Bx, By = self.B[0], self.B[1]
         self.phi = atan((By-Ay) / (Bx-Ax)) * 180 / 3.1415
         self.c = sqrt((Ax-Bx)**2 + (Ay-By)**2)
-        self.zero_x = zero[0]
-        self.zero_y = zero[1]
 
     def shift_x(self, x):
         return x - self.zero_x
@@ -221,14 +221,17 @@ class Math:
     def shift_y(self, y):
         return self.zero_y - y
 
+    def shift(self, C):
+        return self.shift_x(C[0]), self.shift_y(C[1])
+
     def ashift_x(self, x):
         return x + self.zero_x
 
     def ashift_y(self, y):
         return self.zero_y - y
 
-    def acoords(self, C):
-        return tuple(self.ashift_x(C[0]), self.ashift_y(C[1]))
+    def ashift(self, C):
+        return self.ashift_x(C[0]), self.ashift_y(C[1])
 
     def get_c(self, case, data):
         if case == 1:
@@ -237,7 +240,7 @@ class Math:
             self.C1, self.C2 = self.case2(self.c, self.phi, self.A, data['alpha'], data['beta'])
         elif case == 3:
             self.C1, self.C2 = self.case3(self.c, self.phi, self.A, data['a'], data['b'])
-        return self.C1, self.C2, {'A': '({:d}, {:d})'.format(int(self.A[0]),
+        return self.ashift(self.C1), self.ashift(self.C2), {'A': '({:d}, {:d})'.format(int(self.A[0]),
                                                              int(self.A[1])),
                                   'B': '({:d}, {:d})'.format(int(self.B[0]),
                                                              int(self.B[1])),
