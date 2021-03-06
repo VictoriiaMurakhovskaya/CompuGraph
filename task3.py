@@ -28,62 +28,16 @@ def draw_mirrored(c, x0, y0):
     # c.create_line([x0, y0, x_norm(y0 + np.sign(yc - y0) * 10 * k), y0 + np.sign(yc - y0) * 10 * k],
     #               width=1, fill='green', arrow=LAST)
     #
-    # # расчет вектора нормали
-    # yN = np.sign(yc - y0) * 10 * k
-    # xN = x_norm(y0 + np.sign(yc - y0) * 10 * k) - x0
-    # lN = sqrt(xN**2 + yN**2)
-    # yN = yN / lN
-    # xN = xN / lN
-    #
-    # xV = x_fin - press_x
-    # yV = y_fin - press_y
-    #
-    # N = np.array([xN, yN])
-    # V = np.array([xV, yV])
-    #
-    # v = np.dot(V, N)
-    # M = V - 2 * v * N
-    #
-    # x1 = x0 + 0.5 * M[0]
-    # y1 = y0 + 0.5 * M[1]
-    #
-    # c.create_line([x0, y0, x1, y1], width=2, fill='magenta')
-
-
-def redraw(event, c, setarrow=False):
-    """
-    перерисовка изображения на canvas
-    :param event:
-    :param c:
-    :param setarrow:
-    :return:
-    """
-    pass
-    # if setarrow:
-    #     arrow_state = False
-    #     press_x, press_y = 0, 0
-    #     temp_x, temp_y = 0, 0
-    #     x_fin, y_fin = 0, 0
-    # if event:
-    #     a = event.widget.get()
-    # c.delete("all")
-    # if arrow_state:
-    #     c.create_line([press_x, press_y, x_fin, y_fin], width=2, fill='blue', arrow=LAST)
-
-
-
-
-# def update_treeview():
 
 
 class Math:
     """
-    Класс, реализующи необходимые математические операции
+    Класс, реализующий необходимые математические операции
     """
 
-    def __init__(self, xc, yc):
+    def __init__(self, xc, yc, canvas_x, canvas_y):
         """
-        Конструкторк класса, установка параметров системы
+        Конструктор класса, установка параметров системы
         :param xc: x-координата центра зеркала
         :param yc: y-координата центра зеркала
         """
@@ -94,6 +48,11 @@ class Math:
         self.mirror_xy = []
         self.a = 0
         self.phi = 0
+        self.cross_xy = (0, 0)
+        self.vector = (0, 0, 0, 0)
+        self.b1, self.b2 = 0, 0
+        self.canvas_x = canvas_x
+        self.canvas_y = canvas_y
 
     def x_2(self, t):
         """
@@ -122,7 +81,36 @@ class Math:
         x1 = self.x_2(t)
         return -1 * (x1 - self.mirror_x) * np.sin(self.phi) + (t - self.mirror_y) * np.cos(self.phi) + self.mirror_y
 
-    def x_vector(self, vector):
+    def x_der(self, t):
+        """
+        производная x(t) по t
+        :param t:
+        :return: значение производной
+        """
+        return 2 * self.a * t * np.cos(self.phi) - 2 * self.a * self.mirror_y * np.cos(self.phi) + np.sin(self.phi)
+
+    def y_der(self, t):
+        """
+        производная y(t) по t
+        :param t:
+        :return: значение производной
+        """
+        return -2 * self.a * t * np.sin(self.phi) + 2 * self.a * self.mirror_y * np.sin(self.phi) + np.cos(self.phi)
+
+    def derivative(self, t):
+        """
+        производная y(x) по x. Для вычисления использует значения производных координат по параметру
+        :param t:
+        :return: значение производной
+        """
+        return self.x_der(t) / self.y_der(t)
+
+    def set_vector(self, vector):
+        """
+        вычисление параметров уравнения прямой по ее направляющему вектору
+        :param vector: направляющий вектор
+        :return:
+        """
         # чтение координат направляющего вектора луча в привычные переменные
         press_x, press_y, x_fin, y_fin = vector[0], vector[1], vector[2], vector[3]
 
@@ -133,8 +121,8 @@ class Math:
             b1 = 0
             b2 = x_fin
 
-        return b1, b2
-
+        self.b1, self.b2 = b1, b2
+        self.vector = (press_x, press_y, x_fin, y_fin)
 
     def mirror(self, a, phi):
         """
@@ -164,49 +152,106 @@ class Math:
 
         return c1, mirror_border
 
-    def cross(self, vector):
+    def check_side(self):
         """
-        Нахождение точки пересечения луча и параболы
-        :param a: кривизна параболы
-        :param phi: наклон параболы относительно оси
-        :param vector: вектор координат направляющего вектора луча
+        проверка, с какой стороны луч падает на зеркало
         :return:
         """
-        b1, b2 = self.x_vector(vector)
-        press_x, press_y, x_fin, y_fin = vector[0], vector[1], vector[2], vector[3]
+        enter_edge = max(self.lower_edge[0], self.higher_edge[0])
+        if int(self.b1 == 0):
+            enter_y = self.vector[3]
+        else:
+            enter_y = (enter_edge - self.b2) / self.b1
+        return not((self.lower_edge[1] < enter_y) & (self.higher_edge[1] < enter_y)) |\
+                  ((self.lower_edge[1] > enter_y) & (self.higher_edge[1] > enter_y))
+
+    def cross(self):
+        """
+        Нахождение точки пересечения луча и параболы
+        :param vector: вектор координат направляющего вектора луча
+        :return: возвращает True, если луч падает с зеркальной стороны, иначе False
+        """
+        press_x, press_y, x_fin, y_fin = self.vector[0], self.vector[1], self.vector[2], self.vector[3]
         if press_y == y_fin:
-            x_line = np.linspace(0, x_fin, x_fin+1)
+            x_line = np.linspace(0, x_fin, int(x_fin+1))
             y_line = y_fin * np.ones(len(x_line))
         elif np.abs(press_x - x_fin) > np.abs(press_y - y_fin):
-            x_line = np.linspace(0, x_fin, x_fin+1)
-            y_line = (x_line - b2) / b1
+            x_line = np.linspace(0, x_fin, int(x_fin+1))
+            y_line = (x_line - self.b2) / self.b1
         else:
             if y_fin > press_y:
-                y_line = np.linspace(y_fin, 350, 350-y_fin+1)
+                y_line = np.linspace(y_fin, 350, int(350-y_fin+1))
             else:
-                y_line = np.linspace(0, y_fin, y_fin + 1)
-            x_line = b1 * y_line + b2
+                y_line = np.linspace(0, y_fin, int(y_fin + 1))
+            x_line = self.b1 * y_line + self.b2
 
         xy_line = [item for item in zip(x_line, y_line)]
         cross = []
         for item in product(xy_line, self.mirror_xy):
             p1, p2 = item[0], item[1]
-            if sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2) < sqrt(2):
+            if sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2) < sqrt(2.1):
                 cross.append(p2)
         cross = list(set(cross))
-        print(cross)
         if len(cross) > 0:
-            g1_x = cross[0][0]
-            p = cross[0]
-            for item in cross:
-                if item[0] > g1_x:
-                    p = item
-            return p, True
-        else:
-            if y_fin > press_y:
-                return (int(b1 * 350 + b2), 350), False
+            if press_y != y_fin:
+                g1_x = cross[0][0]
+                self.cross_xy = cross[0]
+                for item in cross:
+                    if item[0] > g1_x:
+                        self.cross_xy = item
+                return self.cross_xy, True, self.check_side()
             else:
-                return (int(b2), 0), False
+                for item in cross:
+                    if item[1] == y_fin:
+                        self.cross_xy = item
+                        return self.cross_xy, True, self.check_side()
+                    self.cross_xy = (cross[0][0], y_fin)
+                return self.cross_xy, True, self.check_side()
+        else:
+            self.cross_xy = (0, 0)
+            if y_fin > press_y:
+                self.cross_xy = (int(self.b1 * self.canvas_y + self.b2), self.canvas_y)
+            elif y_fin < press_y:
+                self.cross_xy = (int(self.b2), 0)
+            else:
+                self.cross_xy = (0, y_fin)
+            return self.cross_xy, False, self.check_side()
+
+    def N_vector(self):
+        """
+        Координаты вектора нормали для его изображения
+        :return: координаты вектора нормали в виде списка 4-х координат
+        """
+        x0, y0 = self.cross_xy[0], self.cross_xy[1]
+        y = lambda x: self.derivative(self.cross_xy[1]) * (self.cross_xy[0] - x) + self.cross_xy[1]
+        return [x0, y0, x0+30, y(x0+30)]
+
+    def mirrored_beam(self, k):
+        """
+        определение координат отраженного луча
+        :return: направляющий вектор отраженного луча
+        """
+        vN = self.N_vector()
+        # расчет вектора нормали
+        yN = vN[3] - vN[1]
+        xN = vN[2] - vN[0]
+        lN = sqrt(xN**2 + yN**2)
+        yN = yN / lN
+        xN = xN / lN
+
+        xV = self.vector[2] - self.vector[0]
+        yV = self.vector[3] - self.vector[1]
+
+        N = np.array([xN, yN])
+        V = np.array([xV, yV])
+
+        v = np.dot(V, N)
+        M = V - 2 * v * N
+
+        x1 = self.cross_xy[0] + k * M[0]
+        y1 = self.cross_xy[1] + k * M[1]
+
+        return [self.cross_xy[0], self.cross_xy[1], x1, y1]
 
 
 class Property_viewer(Treeview):
@@ -221,12 +266,28 @@ class Property_viewer(Treeview):
                      'CP': 'Пересечение'}
 
     def update_values(self, key, value):
+        """
+        обновление значений info объекта
+        :param key: ключ обновляемого значения
+        :param value: значение обновляемого значения
+        :return:
+        """
         self.info.update({key: value})
         for x in self.get_children():
             self.delete(x)
         for key in self.info.keys():
             if self.info[key][0] != 0:
                 self.insert("", END, values=[self.txts[key], '({}, {})'.format(self.info[key][0], self.info[key][1])])
+
+    def clear_data(self):
+        """
+        очистка значений (установка нулей)
+        :return:
+        """
+        for key in self.info.keys():
+            self.info[key] = (0, 0)
+        for x in self.get_children():
+            self.delete(x)
 
 
 class App:
@@ -241,7 +302,7 @@ class App:
         self.canvas_height = canvas_y
         self.x_center, self.y_center = 100, int(self.canvas_height / 2)
 
-        self.math = Math(self.x_center, self.y_center)
+        self.math = Math(self.x_center, self.y_center, 550, canvas_y)
         self.mirror_border = 0
         self.arrow_state = False
 
@@ -271,9 +332,7 @@ class App:
         self.angle.pack(side=TOP, pady=(0, 10), padx=(10, 10))
         self.angle.bind("<ButtonRelease-1>", self.redraw)
 
-        Button(butFrame, text='Очистить', width=12,
-               command=lambda event=None, draw_canv=self.c, flag=True: redraw(event, draw_canv,
-                                                                         setarrow=flag)) \
+        Button(butFrame, text='Очистить', width=12, command=lambda x=True: self.redraw(clean=x))\
             .pack(side=LEFT, padx=(10, 5), pady=(5, 10))
         Button(butFrame, text='Закрыть', width=12, command=lambda flag=0: sys.exit(flag)).pack(side=LEFT, padx=(5, 10),
                                                                                                pady=(5, 10))
@@ -347,10 +406,27 @@ class App:
         if self.y_fin == 0:
             return
 
-        cross, cross_flag = self.math.cross([self.press_x, self.press_y, self.x_fin, self.y_fin])
+        self.math.set_vector([self.press_x, self.press_y, self.x_fin, self.y_fin])
+        cross, cross_flag, side_flag = self.math.cross()
         if cross_flag:
-            self.c.create_oval([cross[0]-3, cross[1]-3, cross[0]+3, cross[1]+3], fill='yellow')
+            self.c.create_oval([cross[0]-3, cross[1]-3, cross[0]+3, cross[1]+3], fill='yellow' if side_flag else 'blue')
             self.params.update_values('CP', (cross[0], cross[1]))
+            if side_flag:
+                self.c.create_line(self.math.N_vector(), fill='magenta', arrow=LAST)
+                mirrored = self.math.mirrored_beam(0.4)
+                m_beam = Math(self.x_center, self.y_center, 550, self.canvas_height)
+                m_beam.mirror(self.scal.get(), self.angle.get())
+                m_beam.set_vector(mirrored)
+                second_cross, second_cross_flag, second_side_flag = m_beam.cross()
+                if second_cross_flag:
+                    self.c.create_line([cross[0], cross[1], second_cross[0], second_cross[1]], fill='green', dash=True)
+                    self.c.create_oval([second_cross[0] - 3, second_cross[1] - 3,
+                                        second_cross[0] + 3, second_cross[1] + 3], fill='yellow')
+                    second_mirrored = m_beam.mirrored_beam(0.4)
+                    self.c.create_line(second_mirrored, fill='green', dash=True)
+                else:
+                    self.c.create_line(mirrored, fill='green', dash=True)
+
         else:
             self.params.update_values('CP', (0, 0))
         self.c.create_line([self.x_fin, self.y_fin, cross[0], cross[1]], fill='green', dash=True)
@@ -368,7 +444,7 @@ class App:
         # отображение центра зеркала
         self.c.create_oval(self.x_center, self.y_center, self.x_center - 5, self.y_center-5, fill='green')
 
-    def redraw(self, event=None):
+    def redraw(self, event=None, clean=False):
         """
         Обновление (перерисовка) канвы
         :param event: событие, вызвавшее метод перерисовки
@@ -376,7 +452,13 @@ class App:
         """
         self.c.delete('all')
         self.draw_mirror()
-        if self.check_arrowstate():
+        if clean:
+            self.press_x, self.press_y = 0, 0
+            self.temp_x, self.temp_y = 0, 0
+            self.x_fin, self.y_fin = 0, 0
+            self.x_cross, self.y_cross = 0, 0
+            self.params.clear_data()
+        if self.check_arrowstate() & ~clean:
             self.draw_beam()
 
 
