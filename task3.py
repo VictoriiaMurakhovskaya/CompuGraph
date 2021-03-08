@@ -442,7 +442,32 @@ class App:
         self.c.create_line(list(c1), width=3, fill='red')
 
         # отображение центра зеркала
-        self.c.create_oval(self.x_center, self.y_center, self.x_center - 5, self.y_center-5, fill='green')
+        self.c.create_oval(self.x_center - 3, self.y_center - 3, self.x_center + 3, self.y_center + 3, fill='green')
+
+        # отображение фокуса
+        if self.scal.get() != 0:
+            # расчет фокусного расстояния
+            f = 1 / (4 * self.scal.get())
+
+            # координаты точки фокуса в неподвижной системе координат
+            xf = self.x_center + f
+            yf = self.y_center
+            phi = self.angle.get() / 180 * 3.1415
+            x_focus = (xf - self.x_center) * np.cos(phi) + (yf - self.y_center) * np.sin(phi) + self.x_center
+            y_focus = -1 * (xf - self.x_center) * np.sin(phi) + (yf - self.y_center) * np.cos(phi) + self.y_center
+            self.c.create_oval(x_focus + 2, y_focus + 2, x_focus - 2, y_focus - 2, fill='white')
+
+            if phi == 0:  # парабола не повернута на угол
+                xff = self.mirror_border if self.mirror_border > x_focus else x_focus
+                yff = self.y_center
+            else:
+                xff = int((self.math.higher_edge[0] + self.math.lower_edge[0]) / 2)
+                xff = xff if xff > x_focus else x_focus
+                x_fline = lambda x: (self.y_center - y_focus) * (x - x_focus) / (self.x_center - x_focus) + y_focus
+                yff = x_fline(xff)
+            self.c.create_line([self.x_center, self.y_center, xff, yff], fill='white', dash=True)
+
+
 
     def redraw(self, event=None, clean=False):
         """
