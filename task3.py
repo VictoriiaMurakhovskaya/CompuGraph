@@ -7,29 +7,6 @@ from itertools import product
 from math import sqrt
 
 
-def draw_mirrored(c, x0, y0):
-    """
-    рисует отражение, если луч попал в зеркало
-    :param x0: x-координата пересечения луча с зеркалом
-    :param y0: y-координата пересечения луча с зеркалом
-    :return: None
-    """
-    pass
-    # xc, yc = 30, 115
-    #
-    # # уравнение нормали
-    # x = lambda y: a * (y - yc) ** 2 + xc
-    # x_der = lambda y: 2 * a * (y - yc)
-    # x_norm = lambda y: x(y0) - 1 / x_der(y0) * (y - y0)
-    #
-    # k = 50 / sqrt((10)**2 + (x_norm(y0 + 10) - x0)**2)
-    #
-    # # отрисовка вектора нормали к зеркалу
-    # c.create_line([x0, y0, x_norm(y0 + np.sign(yc - y0) * 10 * k), y0 + np.sign(yc - y0) * 10 * k],
-    #               width=1, fill='green', arrow=LAST)
-    #
-
-
 class Math:
     """
     Класс, реализующий необходимые математические операции
@@ -165,10 +142,12 @@ class Math:
         return not((self.lower_edge[1] < enter_y) & (self.higher_edge[1] < enter_y)) |\
                   ((self.lower_edge[1] > enter_y) & (self.higher_edge[1] > enter_y))
 
+    def euclidDistance(self, p1, p2):
+        return sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)
+
     def cross(self):
         """
         Нахождение точки пересечения луча и параболы
-        :param vector: вектор координат направляющего вектора луча
         :return: возвращает True, если луч падает с зеркальной стороны, иначе False
         """
         press_x, press_y, x_fin, y_fin = self.vector[0], self.vector[1], self.vector[2], self.vector[3]
@@ -189,9 +168,9 @@ class Math:
         cross = []
         for item in product(xy_line, self.mirror_xy):
             p1, p2 = item[0], item[1]
-            if sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2) < sqrt(2.1):
+            if self.euclidDistance(p1, p2) < sqrt(2.1):
                 cross.append(p2)
-        cross = list(set(cross))
+        cross = [item for item in list(set(cross)) if self.euclidDistance(item, (press_x, press_y)) > sqrt(10)]
         if len(cross) > 0:
             if press_y != y_fin:
                 g1_x = cross[0][0]
@@ -408,6 +387,9 @@ class App:
 
         self.math.set_vector([self.press_x, self.press_y, self.x_fin, self.y_fin])
         cross, cross_flag, side_flag = self.math.cross()
+        # начальный луч
+        self.c.create_line([self.x_fin, self.y_fin, cross[0], cross[1]], fill='green', dash=True)
+
         if cross_flag:
             self.c.create_oval([cross[0]-3, cross[1]-3, cross[0]+3, cross[1]+3], fill='yellow' if side_flag else 'blue')
             self.params.update_values('CP', (cross[0], cross[1]))
@@ -422,14 +404,12 @@ class App:
                     self.c.create_line([cross[0], cross[1], second_cross[0], second_cross[1]], fill='green', dash=True)
                     self.c.create_oval([second_cross[0] - 3, second_cross[1] - 3,
                                         second_cross[0] + 3, second_cross[1] + 3], fill='yellow')
-                    second_mirrored = m_beam.mirrored_beam(0.4)
-                    self.c.create_line(second_mirrored, fill='green', dash=True)
+                    self.c.create_line(m_beam.mirrored_beam(2), fill='green', dash=True)
                 else:
                     self.c.create_line(mirrored, fill='green', dash=True)
-
         else:
             self.params.update_values('CP', (0, 0))
-        self.c.create_line([self.x_fin, self.y_fin, cross[0], cross[1]], fill='green', dash=True)
+
 
     def draw_mirror(self):
         """
@@ -458,16 +438,20 @@ class App:
             self.c.create_oval(x_focus + 2, y_focus + 2, x_focus - 2, y_focus - 2, fill='white')
 
             if phi == 0:  # парабола не повернута на угол
+                # построение оси до фокусной точки или до границы зеркала
                 xff = self.mirror_border if self.mirror_border > x_focus else x_focus
                 yff = self.y_center
-            else:
+            else:  # парабола повернута на угол
+                # построение оси до фокусной точки или до границы зеркала
                 xff = int((self.math.higher_edge[0] + self.math.lower_edge[0]) / 2)
                 xff = xff if xff > x_focus else x_focus
+
+                # расчет y-координаты конца оси с использованием уравнения прямой
                 x_fline = lambda x: (self.y_center - y_focus) * (x - x_focus) / (self.x_center - x_focus) + y_focus
                 yff = x_fline(xff)
+
+            # построение оси зеркала на канве
             self.c.create_line([self.x_center, self.y_center, xff, yff], fill='white', dash=True)
-
-
 
     def redraw(self, event=None, clean=False):
         """
