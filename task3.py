@@ -76,11 +76,22 @@ class Math:
 
     def derivative(self, t):
         """
-        производная y(x) по x. Для вычисления использует значения производных координат по параметру
+        производная x(y) по y. Для вычисления использует значения производных координат по параметру
         :param t:
         :return: значение производной
         """
         return self.x_der(t) / self.y_der(t)
+
+    def get_t(self, x, y):
+        ts = []
+        for t in range(0, 500):
+            if self.euclidDistance((x, y), (self.x(t), self.y(t))) < sqrt(2.1):
+                ts.append(t)
+        if len(ts) > 0:
+            return ts[-1]
+        else:
+            print('No t')
+            return None
 
     def set_vector(self, vector):
         """
@@ -202,8 +213,34 @@ class Math:
         :return: координаты вектора нормали в виде списка 4-х координат
         """
         x0, y0 = self.cross_xy[0], self.cross_xy[1]
-        y = lambda x: self.derivative(self.cross_xy[1]) * (self.cross_xy[0] - x) + self.cross_xy[1]
-        return [x0, y0, x0+30, y(x0+30)]
+        t = self.get_t(self.cross_xy[0], self.cross_xy[1])
+        y = lambda x: self.derivative(t) * (self.cross_xy[0] - x) + self.cross_xy[1]
+        k = 20
+        x1 = x0 + k
+        y1 = y(x1)
+        while (self.euclidDistance((x0, y0), (x1, y1)) > 50) | (self.euclidDistance((x0, y0), (x1, y1)) < 40):
+            if self.euclidDistance((x0, y0), (x1, y1)) > 50:
+                k = 0.9 * k
+            elif self.euclidDistance((x0, y0), (x1, y1)) < 40:
+                k = 1.1 * k
+            else:
+                raise ValueError
+            x1 = x0 + k
+            y1 = y(x1)
+        ys = [item[1] for item in self.mirror_xy]
+        if (y1 < min(ys)) | (y1 > max(ys)):
+            x1 = x0 - k
+            y1 = y(x1)
+        while (self.euclidDistance((x0, y0), (x1, y1)) > 50) | (self.euclidDistance((x0, y0), (x1, y1)) < 40):
+            if self.euclidDistance((x0, y0), (x1, y1)) > 50:
+                k = 0.9 * k
+            elif self.euclidDistance((x0, y0), (x1, y1)) < 40:
+                k = 1.1 * k
+            else:
+                raise ValueError
+            x1 = x0 - k
+            y1 = y(x1)
+        return [x0, y0, x1, y1]
 
     def mirrored_beam(self, k):
         """
@@ -409,7 +446,6 @@ class App:
                     self.c.create_line(mirrored, fill='green', dash=True)
         else:
             self.params.update_values('CP', (0, 0))
-
 
     def draw_mirror(self):
         """
