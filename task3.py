@@ -84,8 +84,8 @@ class Math:
 
     def get_t(self, x, y):
         ts = []
-        for t in range(0, 500):
-            if self.euclidDistance((x, y), (self.x(t), self.y(t))) < sqrt(2.1):
+        for t in range(-1000, 1000):
+            if self.euclidDistance((x, y), (self.x(t), self.y(t))) < sqrt(5):
                 ts.append(t)
         if len(ts) > 0:
             return ts[-1]
@@ -150,8 +150,32 @@ class Math:
             enter_y = self.vector[3]
         else:
             enter_y = (enter_edge - self.b2) / self.b1
-        return not((self.lower_edge[1] < enter_y) & (self.higher_edge[1] < enter_y)) |\
-                  ((self.lower_edge[1] > enter_y) & (self.higher_edge[1] > enter_y))
+
+        xs = [item[0] for item in self.mirror_xy]
+        ys = [item[1] for item in self.mirror_xy]
+
+        if self.vector[0] in range(min(xs), max(xs)):
+            return True
+
+        if self.vector[1] in range(min(ys), max(ys)):
+            return True
+
+        if self.lower_edge[1] > self.higher_edge[1]:
+            if int(enter_y) in range(self.higher_edge[1], self.lower_edge[1]):
+                return True
+            else:
+                if np.sign(self.cross_xy[1] - self.lower_edge[1]) != np.sign(self.vector[3] - self.lower_edge[1]):
+                    return True
+                else:
+                    return False
+        else:
+            if int(enter_y) in range(self.lower_edge[1], self.higher_edge[1]):
+                return True
+            else:
+                if np.sign(self.cross_xy[1] - self.higher_edge[1]) != np.sign(self.vector[3] - self.higher_edge[1]):
+                    return True
+                else:
+                    return False
 
     def euclidDistance(self, p1, p2):
         return sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)
@@ -159,20 +183,24 @@ class Math:
     def cross(self):
         """
         Нахождение точки пересечения луча и параболы
-        :return: возвращает True, если луч падает с зеркальной стороны, иначе False
+        :return: координаты точки пересечения
+                 возвращает True, если луч падает с зеркальной стороны, иначе False
         """
         press_x, press_y, x_fin, y_fin = self.vector[0], self.vector[1], self.vector[2], self.vector[3]
         if press_y == y_fin:
-            x_line = np.linspace(0, x_fin, int(x_fin+1))
+            x_line = np.linspace(min(0, x_fin), max(0, x_fin), int(np.abs(x_fin) + 1))
             y_line = y_fin * np.ones(len(x_line))
         elif np.abs(press_x - x_fin) > np.abs(press_y - y_fin):
-            x_line = np.linspace(0, x_fin, int(x_fin+1))
+            if press_x > x_fin:
+                x_line = np.linspace(min(0, x_fin), max(0, x_fin), int(np.abs(x_fin) + 1))
+            else:
+                x_line = np.linspace(min(x_fin, 550), max(x_fin, 550), int(np.abs(550-x_fin) + 1))
             y_line = (x_line - self.b2) / self.b1
         else:
             if y_fin > press_y:
-                y_line = np.linspace(y_fin, 350, int(350-y_fin+1))
+                y_line = np.linspace(min(y_fin, 350), max(350, y_fin), int(np.abs(350-y_fin)+1))
             else:
-                y_line = np.linspace(0, y_fin, int(y_fin + 1))
+                y_line = np.linspace(min(y_fin, 0), max(0, y_fin), int(np.abs(y_fin)+1))
             x_line = self.b1 * y_line + self.b2
 
         xy_line = [item for item in zip(x_line, y_line)]
@@ -181,8 +209,8 @@ class Math:
             p1, p2 = item[0], item[1]
             if self.euclidDistance(p1, p2) < sqrt(2.1):
                 cross.append(p2)
-        cross = [item for item in list(set(cross)) if self.euclidDistance(item, (press_x, press_y)) > sqrt(10)]
-        if len(cross) > 0:
+        cross2 = [item for item in list(set(cross)) if self.euclidDistance(item, (press_x, press_y)) > sqrt(3)]
+        if len(cross2) > 0:
             if press_y != y_fin:
                 g1_x = cross[0][0]
                 self.cross_xy = cross[0]
@@ -267,7 +295,7 @@ class Math:
         x1 = self.cross_xy[0] + k * M[0]
         y1 = self.cross_xy[1] + k * M[1]
 
-        return [self.cross_xy[0], self.cross_xy[1], x1, y1]
+        return [self.cross_xy[0], self.cross_xy[1], int(x1), int(y1)]
 
 
 class Property_viewer(Treeview):
@@ -338,13 +366,13 @@ class App:
 
         Label(setup1, text='Форма зеркала').pack(side=TOP, padx=(10, 0), anchor=W)
         self.scal = Scale(setup1, orient=HORIZONTAL, length=300, from_=0, to=0.015, tickinterval=0.005, resolution=0.001)
-        self.scal.set(0.002)
+        self.scal.set(0.15)
         self.scal.pack(side=TOP, pady=(0, 10), padx=(10, 10))
         self.scal.bind("<ButtonRelease-1>", self.redraw)
 
         Label(setup1, text='Наклон зеркала').pack(side=TOP, padx=(10, 0), anchor=W)
         self.angle = Scale(setup1, orient=HORIZONTAL, length=300, from_=-45, to=45, tickinterval=15, resolution=15)
-        self.angle.set(0)
+        self.angle.set(-45)
         self.angle.pack(side=TOP, pady=(0, 10), padx=(10, 10))
         self.angle.bind("<ButtonRelease-1>", self.redraw)
 
@@ -432,7 +460,7 @@ class App:
             self.params.update_values('CP', (cross[0], cross[1]))
             if side_flag:
                 self.c.create_line(self.math.N_vector(), fill='magenta', arrow=LAST)
-                mirrored = self.math.mirrored_beam(0.4)
+                mirrored = self.math.mirrored_beam(0.3)
                 m_beam = Math(self.x_center, self.y_center, 550, self.canvas_height)
                 m_beam.mirror(self.scal.get(), self.angle.get())
                 m_beam.set_vector(mirrored)
@@ -441,9 +469,9 @@ class App:
                     self.c.create_line([cross[0], cross[1], second_cross[0], second_cross[1]], fill='green', dash=True)
                     self.c.create_oval([second_cross[0] - 3, second_cross[1] - 3,
                                         second_cross[0] + 3, second_cross[1] + 3], fill='yellow')
-                    self.c.create_line(m_beam.mirrored_beam(2), fill='green', dash=True)
+                    self.c.create_line(m_beam.mirrored_beam(10), fill='green', dash=True)
                 else:
-                    self.c.create_line(mirrored, fill='green', dash=True)
+                    self.c.create_line(self.math.mirrored_beam(0.8), fill='green', dash=True)
         else:
             self.params.update_values('CP', (0, 0))
 
